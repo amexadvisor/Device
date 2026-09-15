@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>𝐔𝐒𝐃𝐓 𝐏𝐚𝐲 Verification</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://openfpcdn.io/fingerprintjs/v4" async></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #0f0f13);
+            --text-color: var(--tg-theme-text-color, #ffffff);
+            --hint-color: var(--tg-theme-hint-color, #8e8e93);
+            --btn-color: var(--tg-theme-button-color, #007aff);
+            --success-color: #34c759;
+            --error-color: #ff3b30;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+            background: var(--bg-color); 
+            color: var(--text-color); 
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .media-container {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 16 / 9;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            background: #000;
+        }
+        
+        .media-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .phone-scanner {
+            position: relative;
+            width: 70px;
+            height: 140px;
+            border: 4px solid var(--hint-color);
+            border-radius: 16px;
+            margin: 0 auto 20px auto;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .phone-scanner::before {
+            content: "𝐔𝐒𝐃𝐓 𝐏𝐚𝐲";
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--hint-color);
+            position: absolute;
+            top: 10px;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--btn-color);
+            box-shadow: 0 0 15px var(--btn-color), 0 0 30px var(--btn-color);
+            animation: scan 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes scan {
+            0% { top: 0; opacity: 1; }
+            100% { top: calc(100% - 4px); opacity: 1; }
+        }
+
+        h2 { margin: 0 0 10px 0; font-size: 22px; font-weight: 600; }
+        #status { font-size: 15px; margin-top: 5px; color: var(--hint-color); line-height: 1.4; padding: 0 10px; }
+        
+        .phone-scanner.success-state { border-color: var(--success-color); background: rgba(52, 199, 89, 0.1); }
+        .phone-scanner.success-state .scan-line { display: none; }
+        .phone-scanner.success-state::after { 
+            content: ""; 
+            position: absolute; 
+            width: 16px; 
+            height: 30px; 
+            border: solid var(--success-color); 
+            border-width: 0 5px 5px 0; 
+            transform: rotate(45deg); 
+            margin-bottom: 8px;
+        }
+
+        .phone-scanner.error-state { border-color: var(--error-color); background: rgba(255, 59, 48, 0.1); }
+        .phone-scanner.error-state .scan-line { display: none; }
+        .phone-scanner.error-state::after { 
+            content: "✖"; 
+            font-size: 45px; 
+            color: var(--error-color); 
+            position: absolute;
+            line-height: 140px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="media-container">
+        <video src="@VideoToGifConverterBot.mp4" autoplay loop muted playsinline></video>
+    </div>
+
+    <div class="phone-scanner" id="scanner-box">
+        <div class="scan-line" id="scan-line"></div>
+    </div>
+
+    <h2 id="title">Verifying Device</h2>
+    <p id="status">Connecting...</p>
+
+    <script>
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+
+        async function verifyDevice() {
+            const el = { 
+                title: document.getElementById('title'), 
+                status: document.getElementById('status'), 
+                scannerBox: document.getElementById('scanner-box')
+            };
+
+            function setUI(state, title, message) {
+                el.title.innerText = title;
+                el.status.innerText = message;
+                if (state === 'success') {
+                    el.scannerBox.classList.add('success-state');
+                    el.status.style.color = "var(--success-color)";
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                } else if (state === 'error') {
+                    el.scannerBox.classList.add('error-state');
+                    el.status.style.color = "var(--error-color)";
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                }
+            }
+
+            const rawInitData = window.Telegram.WebApp.initData;
+            const currentUser = window.Telegram.WebApp.initDataUnsafe?.user?.id;
+            
+            if (!rawInitData || !currentUser) {
+                setUI('error', 'Access Denied', 'Telegram security context missing. Please open via the bot.');
+                return;
+            }
+
+            const storedUser = localStorage.getItem('verified_tg_user');
+            const isVerifiedStatus = localStorage.getItem('is_verified') === 'true';
+            const isAlreadyVerified = (storedUser === String(currentUser) && isVerifiedStatus);
+            const isLocalMulti = (storedUser && storedUser != currentUser);
+
+            if (isAlreadyVerified) {
+                setUI('success', 'Already Verified', 'Sending data to bot...');
+            } else {
+                let dots = 0;
+                const loadingInterval = setInterval(() => {
+                    dots = (dots + 1) % 4;
+                    el.status.innerText = "Analyzing hardware identity securely" + ".".repeat(dots);
+                }, 500);
+
+                const randomWaitTime = Math.floor(Math.random() * (15000 - 10000 + 1)) + 10000;
+                await new Promise(resolve => setTimeout(resolve, randomWaitTime));
+                clearInterval(loadingInterval);
+            }
+
+            if (!isLocalMulti) {
+                localStorage.setItem('verified_tg_user', currentUser);
+            }
+
+            let hardwareHash = "fallback_hash";
+            try {
+                const fpPromise = window.FingerprintJS.load();
+                const fp = await fpPromise;
+                const result = await fp.get();
+                hardwareHash = result.visitorId; 
+                localStorage.setItem('saved_fingerprint', hardwareHash);
+            } catch (e) {
+                hardwareHash = localStorage.getItem('saved_fingerprint') || "fallback_hash";
+            }
+
+            try {
+                const response = await fetch("/api/verify", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        initData: rawInitData, // Sending cryptographic context!
+                        is_multi_account: isLocalMulti, 
+                        fingerprint: hardwareHash 
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.setItem('is_verified', 'true'); 
+                    if (!isAlreadyVerified) {
+                        setUI('success', 'Success', 'Verification Complete! Returning to bot...');
+                    } else {
+                        el.status.innerText = "Check the bot for your menu!";
+                    }
+                    setTimeout(() => window.Telegram.WebApp.close(), 2500);
+                } else {
+                    setUI('error', 'Failed', result.message || 'Unallowed activity detected.');
+                }
+            } catch (error) {
+                setUI('error', 'Connection Error', error.message);
+            }
+        }
+        
+        verifyDevice();
+    </script>
+</body>
+  </html>
